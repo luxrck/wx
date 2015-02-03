@@ -1,0 +1,541 @@
+#include <kernel/kernel.h>
+
+#define THANDLER(num, err)	\
+	tcb##num:	\
+	.ifeq err;		\
+	pushl $0;	\
+	.endif;		\
+	pushl $(num);	\
+	jmp _alltraps
+
+.text
+
+THANDLER(0, 0)
+THANDLER(1, 0)
+THANDLER(2, 0)
+THANDLER(3, 0)
+THANDLER(4, 0)
+THANDLER(5, 0)
+THANDLER(6, 0)
+THANDLER(7, 0)
+THANDLER(8, 1)
+THANDLER(9, 0)
+THANDLER(10, 1)
+THANDLER(11, 1)
+THANDLER(12, 1)
+THANDLER(13, 1)
+THANDLER(14, 1)
+THANDLER(15, 0)
+THANDLER(16, 0)
+THANDLER(17, 1)
+THANDLER(18, 0)
+THANDLER(19, 0)
+THANDLER(20, 0)
+THANDLER(21, 0)
+THANDLER(22, 0)
+THANDLER(23, 0)
+THANDLER(24, 0)
+THANDLER(25, 0)
+THANDLER(26, 0)
+THANDLER(27, 0)
+THANDLER(28, 0)
+THANDLER(29, 0)
+THANDLER(30, 0)
+THANDLER(31, 0)
+THANDLER(32, 0)
+THANDLER(33, 0)
+THANDLER(34, 0)
+THANDLER(35, 0)
+THANDLER(36, 0)
+THANDLER(37, 0)
+THANDLER(38, 0)
+THANDLER(39, 0)
+THANDLER(40, 0)
+THANDLER(41, 0)
+THANDLER(42, 0)
+THANDLER(43, 0)
+THANDLER(44, 0)
+THANDLER(45, 0)
+THANDLER(46, 0)
+THANDLER(47, 0)
+THANDLER(48, 0)
+THANDLER(49, 0)
+THANDLER(50, 0)
+THANDLER(51, 0)
+THANDLER(52, 0)
+THANDLER(53, 0)
+THANDLER(54, 0)
+THANDLER(55, 0)
+THANDLER(56, 0)
+THANDLER(57, 0)
+THANDLER(58, 0)
+THANDLER(59, 0)
+THANDLER(60, 0)
+THANDLER(61, 0)
+THANDLER(62, 0)
+THANDLER(63, 0)
+THANDLER(64, 0)
+THANDLER(65, 0)
+THANDLER(66, 0)
+THANDLER(67, 0)
+THANDLER(68, 0)
+THANDLER(69, 0)
+THANDLER(70, 0)
+THANDLER(71, 0)
+THANDLER(72, 0)
+THANDLER(73, 0)
+THANDLER(74, 0)
+THANDLER(75, 0)
+THANDLER(76, 0)
+THANDLER(77, 0)
+THANDLER(78, 0)
+THANDLER(79, 0)
+THANDLER(80, 0)
+THANDLER(81, 0)
+THANDLER(82, 0)
+THANDLER(83, 0)
+THANDLER(84, 0)
+THANDLER(85, 0)
+THANDLER(86, 0)
+THANDLER(87, 0)
+THANDLER(88, 0)
+THANDLER(89, 0)
+THANDLER(90, 0)
+THANDLER(91, 0)
+THANDLER(92, 0)
+THANDLER(93, 0)
+THANDLER(94, 0)
+THANDLER(95, 0)
+THANDLER(96, 0)
+THANDLER(97, 0)
+THANDLER(98, 0)
+THANDLER(99, 0)
+THANDLER(100, 0)
+THANDLER(101, 0)
+THANDLER(102, 0)
+THANDLER(103, 0)
+THANDLER(104, 0)
+THANDLER(105, 0)
+THANDLER(106, 0)
+THANDLER(107, 0)
+THANDLER(108, 0)
+THANDLER(109, 0)
+THANDLER(110, 0)
+THANDLER(111, 0)
+THANDLER(112, 0)
+THANDLER(113, 0)
+THANDLER(114, 0)
+THANDLER(115, 0)
+THANDLER(116, 0)
+THANDLER(117, 0)
+THANDLER(118, 0)
+THANDLER(119, 0)
+THANDLER(120, 0)
+THANDLER(121, 0)
+THANDLER(122, 0)
+THANDLER(123, 0)
+THANDLER(124, 0)
+THANDLER(125, 0)
+THANDLER(126, 0)
+THANDLER(127, 0)
+THANDLER(128, 0)
+THANDLER(129, 0)
+THANDLER(130, 0)
+THANDLER(131, 0)
+THANDLER(132, 0)
+THANDLER(133, 0)
+THANDLER(134, 0)
+THANDLER(135, 0)
+THANDLER(136, 0)
+THANDLER(137, 0)
+THANDLER(138, 0)
+THANDLER(139, 0)
+THANDLER(140, 0)
+THANDLER(141, 0)
+THANDLER(142, 0)
+THANDLER(143, 0)
+THANDLER(144, 0)
+THANDLER(145, 0)
+THANDLER(146, 0)
+THANDLER(147, 0)
+THANDLER(148, 0)
+THANDLER(149, 0)
+THANDLER(150, 0)
+THANDLER(151, 0)
+THANDLER(152, 0)
+THANDLER(153, 0)
+THANDLER(154, 0)
+THANDLER(155, 0)
+THANDLER(156, 0)
+THANDLER(157, 0)
+THANDLER(158, 0)
+THANDLER(159, 0)
+THANDLER(160, 0)
+THANDLER(161, 0)
+THANDLER(162, 0)
+THANDLER(163, 0)
+THANDLER(164, 0)
+THANDLER(165, 0)
+THANDLER(166, 0)
+THANDLER(167, 0)
+THANDLER(168, 0)
+THANDLER(169, 0)
+THANDLER(170, 0)
+THANDLER(171, 0)
+THANDLER(172, 0)
+THANDLER(173, 0)
+THANDLER(174, 0)
+THANDLER(175, 0)
+THANDLER(176, 0)
+THANDLER(177, 0)
+THANDLER(178, 0)
+THANDLER(179, 0)
+THANDLER(180, 0)
+THANDLER(181, 0)
+THANDLER(182, 0)
+THANDLER(183, 0)
+THANDLER(184, 0)
+THANDLER(185, 0)
+THANDLER(186, 0)
+THANDLER(187, 0)
+THANDLER(188, 0)
+THANDLER(189, 0)
+THANDLER(190, 0)
+THANDLER(191, 0)
+THANDLER(192, 0)
+THANDLER(193, 0)
+THANDLER(194, 0)
+THANDLER(195, 0)
+THANDLER(196, 0)
+THANDLER(197, 0)
+THANDLER(198, 0)
+THANDLER(199, 0)
+THANDLER(200, 0)
+THANDLER(201, 0)
+THANDLER(202, 0)
+THANDLER(203, 0)
+THANDLER(204, 0)
+THANDLER(205, 0)
+THANDLER(206, 0)
+THANDLER(207, 0)
+THANDLER(208, 0)
+THANDLER(209, 0)
+THANDLER(210, 0)
+THANDLER(211, 0)
+THANDLER(212, 0)
+THANDLER(213, 0)
+THANDLER(214, 0)
+THANDLER(215, 0)
+THANDLER(216, 0)
+THANDLER(217, 0)
+THANDLER(218, 0)
+THANDLER(219, 0)
+THANDLER(220, 0)
+THANDLER(221, 0)
+THANDLER(222, 0)
+THANDLER(223, 0)
+THANDLER(224, 0)
+THANDLER(225, 0)
+THANDLER(226, 0)
+THANDLER(227, 0)
+THANDLER(228, 0)
+THANDLER(229, 0)
+THANDLER(230, 0)
+THANDLER(231, 0)
+THANDLER(232, 0)
+THANDLER(233, 0)
+THANDLER(234, 0)
+THANDLER(235, 0)
+THANDLER(236, 0)
+THANDLER(237, 0)
+THANDLER(238, 0)
+THANDLER(239, 0)
+THANDLER(240, 0)
+THANDLER(241, 0)
+THANDLER(242, 0)
+THANDLER(243, 0)
+THANDLER(244, 0)
+THANDLER(245, 0)
+THANDLER(246, 0)
+THANDLER(247, 0)
+THANDLER(248, 0)
+THANDLER(249, 0)
+THANDLER(250, 0)
+THANDLER(251, 0)
+THANDLER(252, 0)
+THANDLER(253, 0)
+THANDLER(254, 0)
+THANDLER(255, 0)
+
+.globl _alltraps
+_alltraps:
+	pushl %ds
+	pushl %es
+	pushl %eax
+	movw $GD_KD, %ax
+	movw %ax, %ds
+	movw %ax, %es
+	popl %eax
+	pushal
+	pushl %esp
+	call trap
+
+.data
+.globl tcb
+tcb:
+	.long tcb0;
+	.long tcb1;
+	.long tcb2;
+	.long tcb3;
+	.long tcb4;
+	.long tcb5;
+	.long tcb6;
+	.long tcb7;
+	.long tcb8;
+	.long tcb9;
+	.long tcb10;
+	.long tcb11;
+	.long tcb12;
+	.long tcb13;
+	.long tcb14;
+	.long tcb15;
+	.long tcb16;
+	.long tcb17;
+	.long tcb18;
+	.long tcb19;
+	.long tcb20
+	.long tcb21
+	.long tcb22
+	.long tcb23
+	.long tcb24
+	.long tcb25
+	.long tcb26
+	.long tcb27
+	.long tcb28
+	.long tcb29
+	.long tcb30
+	.long tcb31
+	.long tcb32
+	.long tcb33
+	.long tcb34
+	.long tcb35
+	.long tcb36
+	.long tcb37
+	.long tcb38
+	.long tcb39
+	.long tcb40
+	.long tcb41
+	.long tcb42
+	.long tcb43
+	.long tcb44
+	.long tcb45
+	.long tcb46
+	.long tcb47
+	.long tcb48
+	.long tcb49
+	.long tcb50
+	.long tcb51
+	.long tcb52
+	.long tcb53
+	.long tcb54
+	.long tcb55
+	.long tcb56
+	.long tcb57
+	.long tcb58
+	.long tcb59
+	.long tcb60
+	.long tcb61
+	.long tcb62
+	.long tcb63
+	.long tcb64
+	.long tcb65
+	.long tcb66
+	.long tcb67
+	.long tcb68
+	.long tcb69
+	.long tcb70
+	.long tcb71
+	.long tcb72
+	.long tcb73
+	.long tcb74
+	.long tcb75
+	.long tcb76
+	.long tcb77
+	.long tcb78
+	.long tcb79
+	.long tcb80
+	.long tcb81
+	.long tcb82
+	.long tcb83
+	.long tcb84
+	.long tcb85
+	.long tcb86
+	.long tcb87
+	.long tcb88
+	.long tcb89
+	.long tcb90
+	.long tcb91
+	.long tcb92
+	.long tcb93
+	.long tcb94
+	.long tcb95
+	.long tcb96
+	.long tcb97
+	.long tcb98
+	.long tcb99
+	.long tcb100
+	.long tcb101
+	.long tcb102
+	.long tcb103
+	.long tcb104
+	.long tcb105
+	.long tcb106
+	.long tcb107
+	.long tcb108
+	.long tcb109
+	.long tcb110
+	.long tcb111
+	.long tcb112
+	.long tcb113
+	.long tcb114
+	.long tcb115
+	.long tcb116
+	.long tcb117
+	.long tcb118
+	.long tcb119
+	.long tcb120
+	.long tcb121
+	.long tcb122
+	.long tcb123
+	.long tcb124
+	.long tcb125
+	.long tcb126
+	.long tcb127
+	.long tcb128
+	.long tcb129
+	.long tcb130
+	.long tcb131
+	.long tcb132
+	.long tcb133
+	.long tcb134
+	.long tcb135
+	.long tcb136
+	.long tcb137
+	.long tcb138
+	.long tcb139
+	.long tcb140
+	.long tcb141
+	.long tcb142
+	.long tcb143
+	.long tcb144
+	.long tcb145
+	.long tcb146
+	.long tcb147
+	.long tcb148
+	.long tcb149
+	.long tcb150
+	.long tcb151
+	.long tcb152
+	.long tcb153
+	.long tcb154
+	.long tcb155
+	.long tcb156
+	.long tcb157
+	.long tcb158
+	.long tcb159
+	.long tcb160
+	.long tcb161
+	.long tcb162
+	.long tcb163
+	.long tcb164
+	.long tcb165
+	.long tcb166
+	.long tcb167
+	.long tcb168
+	.long tcb169
+	.long tcb170
+	.long tcb171
+	.long tcb172
+	.long tcb173
+	.long tcb174
+	.long tcb175
+	.long tcb176
+	.long tcb177
+	.long tcb178
+	.long tcb179
+	.long tcb180
+	.long tcb181
+	.long tcb182
+	.long tcb183
+	.long tcb184
+	.long tcb185
+	.long tcb186
+	.long tcb187
+	.long tcb188
+	.long tcb189
+	.long tcb190
+	.long tcb191
+	.long tcb192
+	.long tcb193
+	.long tcb194
+	.long tcb195
+	.long tcb196
+	.long tcb197
+	.long tcb198
+	.long tcb199
+	.long tcb200
+	.long tcb201
+	.long tcb202
+	.long tcb203
+	.long tcb204
+	.long tcb205
+	.long tcb206
+	.long tcb207
+	.long tcb208
+	.long tcb209
+	.long tcb210
+	.long tcb211
+	.long tcb212
+	.long tcb213
+	.long tcb214
+	.long tcb215
+	.long tcb216
+	.long tcb217
+	.long tcb218
+	.long tcb219
+	.long tcb220
+	.long tcb221
+	.long tcb222
+	.long tcb223
+	.long tcb224
+	.long tcb225
+	.long tcb226
+	.long tcb227
+	.long tcb228
+	.long tcb229
+	.long tcb230
+	.long tcb231
+	.long tcb232
+	.long tcb233
+	.long tcb234
+	.long tcb235
+	.long tcb236
+	.long tcb237
+	.long tcb238
+	.long tcb239
+	.long tcb240
+	.long tcb241
+	.long tcb242
+	.long tcb243
+	.long tcb244
+	.long tcb245
+	.long tcb246
+	.long tcb247
+	.long tcb248
+	.long tcb249
+	.long tcb250
+	.long tcb251
+	.long tcb252
+	.long tcb253
+	.long tcb254
+	.long tcb255

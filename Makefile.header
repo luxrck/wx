@@ -1,0 +1,10 @@
+AS		:= as --32
+CC		:= gcc -pipe
+AR		:= ar
+LD		:= ld
+OBJDUMP	:= objdump
+
+UBIN	:= hello ab
+
+CFLAGS	:= -nostdinc -O1 -MD -m32 -std=gnu99 -fno-builtin -fno-omit-frame-pointer -Wno-format -Wall -Wno-unused -Werror -gstabs
+LDFLAGS	:= -m elf_i386
