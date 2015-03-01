@@ -1,5 +1,5 @@
-#define GD_KT	0x8         # kernel code segment selector
-#define GD_KD	0x10        # kernel data segment selector
+.set GD_KT,	0x08         # kernel code segment selector
+.set GD_KD,	0x10        # kernel data segment selector
 
 .globl start16
 start16:

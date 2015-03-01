@@ -256,7 +256,7 @@ static __inline uint32_t
 read_ebp(void)
 {
 	uint32_t ebp;
-	__asm __volatile("movl %%ebp,%0" : "=r" (ebp));
+	__asm __volatile("movl %%ebp,%0" : "=m" (ebp));
 	return ebp;
 }
 
@@ -264,7 +264,7 @@ static __inline uint32_t
 read_esp(void)
 {
 	uint32_t esp;
-	__asm __volatile("movl %%esp,%0" : "=r" (esp));
+	__asm __volatile("movl %%esp,%0" : "=m" (esp));
 	return esp;
 }
 

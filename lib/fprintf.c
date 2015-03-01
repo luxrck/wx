@@ -1,81 +1,59 @@
-#include <inc/lib.h>
+#include <stdio.h>
 
-// Collect up to 256 characters into a buffer
-// and perform ONE system call to print all of them,
-// in order to make the lines output to the console atomic
-// and prevent interrupts from causing context switches
-// in the middle of a console output line and such.
-struct printbuf {
-	int fd;		// file descriptor
-	int idx;	// current buffer index
-	ssize_t result;	// accumulated results from write
-	int error;	// first error that occurred
-	char buf[256];
-};
+#include <lib/printf.h>
 
-
-static void
-writebuf(struct printbuf *b)
+static void __flushbuf(struct printbuf *b)
 {
-	if (b->error > 0) {
-		ssize_t result = write(b->fd, b->buf, b->idx);
-		if (result > 0)
-			b->result += result;
-		if (result != b->idx) // error, or wrote less than supplied
-			b->error = (result < 0 ? result : 0);
+	if (b->error < 0) return;
+	int r = write(b->fd, b->data, b->cpos);
+	if (r > 0) b->tolwrite += r;
+	if (r < 0) b->error = r;
+}
+
+static void putch(int c, void *data)
+{
+	struct printbuf *b = (struct printbuf *)data;
+	b->data[b->cpos++] = c;
+	if (b->cpos == PRINTBUFLEN) {
+		__flushbuf(b);
+		b->cpos = 0;
 	}
 }
 
-static void
-putch(int ch, void *thunk)
+int vfprintf(int fd, const char *fmt, va_list ap)
 {
-	struct printbuf *b = (struct printbuf *) thunk;
-	b->buf[b->idx++] = ch;
-	if (b->idx == 256) {
-		writebuf(b);
-		b->idx = 0;
-	}
-}
-
-int
-vfprintf(int fd, const char *fmt, va_list ap)
-{
-	struct printbuf b;
-
+	struct printbuf b = {0};
 	b.fd = fd;
-	b.idx = 0;
-	b.result = 0;
-	b.error = 1;
 	vprintfmt(putch, &b, fmt, ap);
-	if (b.idx > 0)
-		writebuf(&b);
-
-	return (b.result ? b.result : b.error);
+	if (b.cpos > 0) __flushbuf(&b);
+	return (b.tolwrite ? b.tolwrite : b.error);
 }
 
-int
-fprintf(int fd, const char *fmt, ...)
+int fprintf(int fd, const char *fmt, ...)
 {
 	va_list ap;
-	int cnt;
+	int ret;
 
 	va_start(ap, fmt);
-	cnt = vfprintf(fd, fmt, ap);
+	ret = vfprintf(fd, fmt, ap);
 	va_end(ap);
 
-	return cnt;
+	return ret;
 }
 
-int
-printf(const char *fmt, ...)
+int vprintf(const char *fmt, va_list ap)
+{
+	return vfprintf(1, fmt, ap);
+}
+
+int printf(const char *fmt, ...)
 {
 	va_list ap;
-	int cnt;
+	int ret;
 
 	va_start(ap, fmt);
-	cnt = vfprintf(1, fmt, ap);
+	ret = vfprintf(1, fmt, ap);
 	va_end(ap);
 
-	return cnt;
+	return ret;
 }
-

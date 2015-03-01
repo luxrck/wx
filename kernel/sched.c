@@ -7,13 +7,15 @@
 // Choose a user environment to run and run it.
 void scheduler(void)
 {
+	//asm volatile("cli");
 	if (!tasks) goto ksh;
 	struct proc *it = tasks;
-	printf("sched ");
+	
+	/*printf("sched ");
 	while (it) {
 		printf("[%d %d %d] ", it->pid, it->state, it->parent ? it->parent->pid : 0);
 		it = it->next;
-	}
+	}*/
 	if (!ctask) ctask = tasks;
 	struct proc *tk = ctask->next;
 	while (tk != ctask) {
@@ -25,10 +27,14 @@ void scheduler(void)
 			procrestore(tk);
 		tk = tk->next;
 	}
+	
 	if (ctask->state == PROC_RUNNING || ctask->state == PROC_RUNNABLE)
 		procrestore(ctask);
-	else
-		procfree(ctask);
+
+	procrestore(procget(PID_INIT));
+	//else
+	//	procfree(ctask);
+	//asm volatile("sti\n1:\n\tjmp 1b");
 ksh:
 	kshell();
 	panic("scheduler never should reach here. ctask->state: %x", ctask->state);

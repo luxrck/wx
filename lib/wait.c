@@ -1,13 +1,8 @@
-#include <inc/lib.h>
+#include <lib/libc.h>
 
-// Waits until 'envid' exits.
-void
-wait(envid_t envid)
+syscall2(pid_t, waitpid, pid_t, pid, int, options)
+
+pid_t wait(void)
 {
-	const volatile struct Env *e;
-
-	assert(envid != 0);
-	e = &envs[ENVX(envid)];
-	while (e->env_id == envid && e->env_status != ENV_FREE)
-		sys_yield();
+	return waitpid(-1, 0);
 }

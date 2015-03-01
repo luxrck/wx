@@ -8,6 +8,7 @@
 
 int strlen(const char *s)
 {
+	if (!s) return 0;
 	int n = 0;
 	while (s[n++] != '\0');
 	return n - 1;
@@ -100,6 +101,24 @@ strfind(const char *s, char c)
 		if (*s == c)
 			break;
 	return (char *) s;
+}
+
+const char* strstr(const char *s1, const char *s2)
+{
+	const char* pos = 0, *i2 = s2;
+	while (*s1 && *s2) {
+		if (*s1 == *s2) {
+			if (!pos)
+				pos = s1;
+			i2++;
+		} else if (pos) {
+			s1 = ++pos;
+			pos = 0;
+			i2 = s2;
+		}
+		s1++;
+	}
+	return pos;
 }
 
 #if ASM

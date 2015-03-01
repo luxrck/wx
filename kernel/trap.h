@@ -100,16 +100,7 @@ void trapinit(void);
 void print_trapframe(struct trapframe *tf);
 void backtrace(struct trapframe *tf);
 
-static inline void trapret(struct trapframe *tf)
-{
-	asm volatile("movl %0,%%esp\n\t"
-		"popal\n\t"
-		"popl %%es\n\t"
-		"popl %%ds\n\t"
-		"addl $0x8,%%esp\n\t" /* skip tf_trapno and tf_errcode */
-		"iret\n\t"
-		: : "g" (tf) : "memory");
-	panic("iret failed");  /* mostly to placate the compiler */
-}
+// Interrupt Handler
+void kbd_intr(void);
 
 #endif /* !__TRAP_H__ */

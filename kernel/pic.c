@@ -4,7 +4,7 @@
 
 // Current IRQ mask.
 // Enable IRQ0, IRQ1, IRQ2
-static uint16_t mask = 0xFFF8;
+static uint16_t mask = 0xFFFF;
 
 static void pitset(int rate)
 {
@@ -69,12 +69,13 @@ void picinit(void)
 	outb(IO_PIC2, 0x68);				// OCW3
 	outb(IO_PIC2, 0x0a);				// OCW3
 
-	irqset(mask);
+	irqset(0);
+	irqset(1);
 }
 
 void irqset(uint16_t irq)
 {
-	mask &= ~irq;
+	mask &= ~(1 << irq);
 	outb(IO_PIC1+1, mask);
 	outb(IO_PIC2+1, mask >> 8);
 }

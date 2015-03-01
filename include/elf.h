@@ -32,21 +32,38 @@ struct proghdr {
 	uint32_t align;
 };
 
-// Values for Proghdr::p_type
+struct secthdr {
+	uint32_t name;
+	uint32_t type;
+	uint32_t flags;
+	uint32_t addr;
+	uint32_t offset;
+	uint32_t size;
+	uint32_t link;
+	uint32_t info;
+	uint32_t addralign;
+	uint32_t entsize;
+};
+
+// Values for proghdr::type
 #define ELF_PROG_LOAD		1
 
-// Flag bits for Proghdr::p_flags
+// Flag bits for proghdr::flags
 #define ELF_PROG_FLAG_EXEC	1
 #define ELF_PROG_FLAG_WRITE	2
 #define ELF_PROG_FLAG_READ	4
 
-// Values for Secthdr::sh_type
+// Values for secthdr::type
 #define ELF_SHT_NULL		0
 #define ELF_SHT_PROGBITS	1
 #define ELF_SHT_SYMTAB		2
 #define ELF_SHT_STRTAB		3
 
-// Values for Secthdr::sh_name
+// Values for secthdr::name
 #define ELF_SHN_UNDEF		0
+
+// Flag bits for secthdr::flags
+#define ELF_SHF_WRITE		1
+#define ELF_SHF_ALLOC		2
 
 #endif /* !__ELF_H__ */

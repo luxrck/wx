@@ -9,6 +9,7 @@
 ###################################################################
 
 #define	RELOC(x) ((x) - KERNBASE)
+#define PGNUM(x) ((x) >> 12)
 
 .text
 
@@ -29,6 +30,16 @@ entry:
     movw	$0x1234,0x472			# warm boot
 
 	# Setup temporary page management.
+	movl	$0x0, %eax
+bootpgtableinit:
+	movl	%eax, %edx
+	shl		$0xc, %edx
+	orl		$(PTE_W|PTE_P), %edx
+	movl	%edx, RELOC(bootpgtable)(,%eax,4)
+	addl	$0x1, %eax
+	cmpl	$NPTE, %eax
+	jne		bootpgtableinit
+
 	movl	$(RELOC(bootpgdir)), %eax
 	movl	%eax, %cr3
 	# Turn on paging.
@@ -46,7 +57,7 @@ relocated:
 	# Clear the frame pointer register (EBP)
 	# so that once we get into debugging C code,
 	# stack backtraces will be terminated properly.
-	movl	$0x0,%ebp			# nuke frame pointer
+	movl	$0x0, %ebp			# nuke frame pointer
 
 	# Set the stack pointer
 	movl	$(bootstacktop),%esp

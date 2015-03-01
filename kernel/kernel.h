@@ -13,6 +13,7 @@
 
 #define USERBASE	0x800000
 #define UTOP		MMIOBASE
+#define UXSTACKTOP	UTOP
 #define USTACKTOP	(UTOP - 2*PGSIZE)
 
 #define IOPHYSMEM	0x0A0000
@@ -151,6 +152,8 @@
 
 typedef uint32_t pde_t;
 typedef uint32_t pte_t;
+
+typedef uint32_t spinlock;
 
 #define UL(x) ((uint64_t)(x))
 

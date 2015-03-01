@@ -46,11 +46,12 @@ _kaddr(const char *file, int line, physaddr_t pa)
 	return (void *)(pa + KERNBASE);
 }
 
+typedef int (*pageforeachcallback) (pde_t *pgdir, int index, pte_t pte, void *data);
 void meminit(void);
 
 void pageinit(void);
 pte_t* pteget(pde_t *pgdir, const void *va, int create);
-void pageforeach(pde_t *pgdir, int(*cb)(int index, pte_t pte, void *data), void *data);
+void pageforeach(pde_t *pgdir, pageforeachcallback cb, void *data);
 int vamap(pde_t *pgdir, struct page *pp, void *va, int perm);
 void vaunmap(pde_t *pgdir, void *va);
 void varemap(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm);

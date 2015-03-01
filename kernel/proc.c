@@ -1,6 +1,7 @@
 #include <x86.h>
 #include <elf.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <kernel/kernel.h>
@@ -8,6 +9,7 @@
 #include <kernel/mm.h>
 #include <kernel/proc.h>
 #include <kernel/trap.h>
+#include <kernel/device.h>
 
 // ap: 0 system,		1 application
 // gr: 0 block = 1B,	1 block = 4K
@@ -28,9 +30,33 @@ uint64_t gdt[NCPU + 5];
 #define UINITPATH	"/init"
 static struct proc *uinit = NULL;
 
+static void __ldelf(struct proc *e, int fd);
+
 static void procuserinit(void)
 {
-	return;
+	struct proc *e = procalloc();
+
+	vamap(e->pgdir, pagealloc(1), (void*)(UXSTACKTOP-PGSIZE), PTE_W|PTE_U|PTE_P);
+	
+	vamap(e->pgdir, pagealloc(1), (void*)(USTACKTOP-PGSIZE), PTE_W|PTE_U|PTE_P);
+	vamap(e->pgdir, pagealloc(1), (void*)(USTACKTOP-PGSIZE*2), PTE_W|PTE_U|PTE_P);
+
+	ctask = e;
+
+	e->state = PROC_RUNNABLE;
+	e->parent = NULL;
+	e->sb = sbread(rootdev);
+	e->root = FS_ROOTI;
+	e->cwd = e->root;
+
+	int fd = open(UINITPATH, O_RDONLY);
+	if (fd < 0)
+		panic("can not open '/init'");
+	printf("uinit: %d\n", fd);
+
+	__ldelf(e, fd);
+
+	close(fd);
 }
 
 void procinit(void)
@@ -43,7 +69,7 @@ void procinit(void)
 	// We don't support SMP, so we just set TSS0.
 	// We create TSS for each CPU and uses them for all tasks.
 	tss.ss0 = GD_KD;
-	tss.esp0 = KSTACKTOP;
+	tss.esp0 = UXSTACKTOP;
 	gdt[5] = SEG(STS_T32A, (uint32_t)&tss, sizeof(tss), 0, 0, 0, 1);
 
 	for (int i=1; i < NPROC; i++)
@@ -88,7 +114,7 @@ struct proc* procalloc(void)
 	task->tf.eflags |= FL_IF;
 
 	task->pid = avaliable_pid++;
-	task->state = PROC_BLOCKED;
+	task->state = PROC_SLEEPING;
 	task->count = 0;
 
 	task->next = tasks;
@@ -97,7 +123,7 @@ struct proc* procalloc(void)
 	return task;
 }
 
-static int unmappage(int index, pte_t pte, void *pgdir)
+static int __unmappage(pde_t *pgdir, int index, pte_t pte, void *data)
 {
 	if (index >= PGNUM(UTOP)) return 0;
 	vaunmap(pgdir, (void*)(index * PGSIZE));
@@ -105,15 +131,15 @@ static int unmappage(int index, pte_t pte, void *pgdir)
 }
 void procfree(struct proc *tk)
 {
-	printf("proc free [%d %d %d] ", tk->pid, tk->state, tk->parent ? tk->parent->pid : 0);
 	if (tk->parent)
 		tk->parent->state = PROC_RUNNABLE;
 	if (tk == ctask) {
-		lcr3(PADDR(kpgdir));
+		//lcr3(PADDR(kpgdir));
 		ctask = NULL;
+		return;
 	}
 
-	pageforeach(tk->pgdir, unmappage, tk->pgdir);
+	pageforeach(tk->pgdir, __unmappage, NULL);
 	for (int i=0; i<PDX(UTOP); i++) {
 		if (!tk->pgdir[i]) continue;
 		pagedecref(pa2page(PTE_ADDR(tk->pgdir[i])));
@@ -127,9 +153,46 @@ void procfree(struct proc *tk)
 	if (it) it->next = tk->next;
 	
 	memset(tk, 0, sizeof(struct trapframe));
+	
+	tk->root = tk->cwd = 0;
+	tk->sb = 0;
 
 	tk->next = procs;
 	procs = tk;
+}
+
+// MUST NOT BE INLINE!
+// THIS IMPLEMENTATION RELAY ON C'S CALL STACK.
+void procsavecontext(struct procexec *ec)
+{
+	asm volatile("movl 8(%%ebp),	%%esp\n\t"
+		"addl	$36,		%%esp\n\t"
+		"pusha\n\t"
+		"movl	(%%ebp),	%%eax\n\t"
+		"movl	%%eax,		8(%%esp)\n\t"	// save oebp
+		"movl	%%ebp,		12(%%esp)\n\t"	// save oesp
+		"addl	$8,			12(%%esp)\n\t"
+		"movl	4(%%ebp),	%%eax\n\t"
+		"pushl	%%eax\n\t"
+		//"cmpl	$0,			0xc(%%ebp)\n\t"
+		//"je		1f\n\t"
+		//"movl	0xc(%%ebp),	%%eax\n\t"
+		//"movl	%%eax,		(%%esp)\n"		// recall parent function
+		//"movl (%%ebp),	16(%%esp)"
+		//"1:\n\t"
+		"movl	%%ebp,		%%esp"
+		::: "memory" );
+}
+
+void procrestorecontext(struct procexec *ec)
+{
+	asm volatile("movl 8(%%ebp), %%esp\n\t"
+		"addl $4, %%esp\n\t"
+		"popal\n\t"
+		"movl %%esp, %%eax\n\t"
+		"movl -20(%%eax), %%esp\n\t"
+		"jmp *-36(%%eax)"
+		::: "memory" );
 }
 
 void procrestore(struct proc* tk)
@@ -143,9 +206,11 @@ void procrestore(struct proc* tk)
 	lcr3(PADDR(ctask->pgdir));
 
 	ctask->count++;
+	
+	if (ctask->ec.eip)
+		procrestorecontext(&ctask->ec);
 
-	printf("proc run [%d %d] ", tk->pid, tk->parent ? tk->parent->pid : 0);
-	asm volatile("movl %0,%%esp\n\t"
+	asm volatile("movl %0, %%esp\n\t"
 		"popal\n\t"
 		"popl %%es\n\t"
 		"popl %%ds\n\t"
@@ -155,53 +220,260 @@ void procrestore(struct proc* tk)
 	panic("iret failed");
 }
 
-static int duppage(int index, pte_t pte, void *pgdir)
+static int __duppage(pde_t *pgdir, int index, pte_t pte, void *data)
 {
-	if (index >= PGNUM(UTOP)) return 0;
+	if (index >= PGNUM(USTACKTOP)) return 0;
 	index *= PGSIZE;
 	struct page *pp = pagealloc(1);
 	memcpy(page2kva(pp), (void*)index, PGSIZE);
-	vamap(pgdir, pp, (void*)index, PTE_W|PTE_U|PTE_P);
+	vamap(data, pp, (void*)index, PTE_W|PTE_U|PTE_P);
 	return 1;
 }
 pid_t fork(void)
 {
 	struct proc *child;
-	if (!(child = procalloc())) {
-		errno = EAGAIN;
-		return -1;
-	}
-	/*for (int i=0; i<=PDX(USTACKTOP); i++) {
-		if (!ctask->pgdir[i]) continue;
-		pte_t *pte = KADDR(PTE_ADDR(ctask->pgdir[i]));
-		for (int j=0; j<0x400; j++) {
-			if (!pte[j]) continue;
-			struct page *pp = pagealloc(1);
-			uintptr_t va = (i << PTSHIFT) + j * PGSIZE;
-			memcpy(page2kva(pp), (void*)va, PGSIZE);
-			vamap(child->pgdir, pp, (void*)va, PTE_W|PTE_U|PTE_P);
-		}
-	}*/
-	pageforeach(ctask->pgdir, duppage, child->pgdir);
+	if (!(child = procalloc()))
+		return -EAGAIN;
+	
+	pageforeach(ctask->pgdir, __duppage, child->pgdir);
+	
+	vamap(child->pgdir, pagealloc(1), (void*)(UXSTACKTOP-PGSIZE), PTE_W|PTE_U|PTE_P);
+	vamap(child->pgdir, pagealloc(1), (void*)(UXSTACKTOP-PGSIZE*2), PTE_W|PTE_U|PTE_P);
+	
 	child->tf = ctask->tf;
 	child->tf.eax = 0;
 	child->parent = ctask;
 	child->state = PROC_RUNNABLE;
+	
+	child->etext = ctask->etext;
+	child->edata = ctask->edata;
+	child->end = ctask->end;
+	child->brk = ctask->brk;
+
+	child->sb = ctask->sb;
+	child->root = ctask->root;
+	child->cwd = ctask->cwd;
+
+	for (int i=0; i<NPOF; i++) {
+		if (ctask->filp[i]) {
+			child->filp[i] = ctask->filp[i];
+			ctask->filp[i]->ref++;
+		}
+	}
+
 	return child->pid;
+}
+
+static void __elfsegmap(struct proc *e, void *va, size_t len)
+{
+	char *vb = ROUNDDOWN(va, PGSIZE);
+	char *vt = ROUNDUP(va + len, PGSIZE);
+
+	for (; vb<vt; vb+=PGSIZE) {
+		if (!pteget(e->pgdir, vb, 0))
+			vamap(e->pgdir, pagealloc(1), vb, PTE_U | PTE_W | PTE_P);
+		else
+			memset(vb, 0, PGSIZE);
+	}
+}
+static void __elfsegldd(int fd, void *va, off_t offset, size_t count)
+{
+	struct page *pp = pagealloc(1);
+	char *binary = (char*)page2kva(pp);
+
+	lseek(fd, offset, SEEK_SET);
+
+	int r = 0;
+	for (int i=0; i<count/PGSIZE; i++, va+=PGSIZE) {
+		r = read(fd, binary, PGSIZE);
+		if (r < 0)
+			panic("__elfsegldd: %d", r);
+		memcpy(va, binary, PGSIZE);
+	}
+
+	read(fd, binary, count % PGSIZE);
+	//printf("__elfsegldd.3: %x %x\n", va, count % PGSIZE);
+	memcpy(va, binary, count % PGSIZE);
+
+	pagedecref(pp);
+}
+static void __ldelf(struct proc *e, int fd)
+{
+	lcr3(PADDR(e->pgdir));
+	
+	struct page *pp = pagealloc(1);
+	char *binary = (char*)page2kva(pp);
+
+	int r = read(fd, binary, PGSIZE);
+	if (r < 0)
+		panic("__ldelf: %d", r);
+
+	struct elf *eheader = (struct elf*)binary;
+	struct proghdr *ph = (struct proghdr*)(binary + eheader->phoff);
+	struct proghdr *eph = ph + eheader->phnum;
+
+	if (eheader->magic != ELF_MAGIC)
+		panic("Bad ELF file: %x", eheader->magic);
+
+	e->tf.eip = eheader->entry;
+
+	if (ph->filesz > ph->memsz)
+		panic("ELF binary memory overflow.");
+
+	for (; ph<eph; ph++) {
+		if (ph->type == ELF_PROG_LOAD) {
+			__elfsegmap(e, (char*)ph->va, ph->memsz);
+			__elfsegldd(fd, (void*)ph->va, ph->offset, ph->filesz);
+		}
+	}
+
+	size_t pm = ROUNDUP(ph->memsz, PGSIZE);
+	memset((char*)(ph->va+ph->filesz), 0, pm - ph->memsz);
+
+	lseek(fd, eheader->shoff, SEEK_SET);
+	uint16_t ssndx = eheader->shstrndx;
+	uint16_t shnum = eheader->shnum;
+	
+	read(fd, binary, 2048);
+	char *binary1 = binary + 2048;
+
+	struct secthdr *sh = (struct secthdr*)binary;
+	struct secthdr *ss = sh + ssndx;
+	
+	lseek(fd, ss->offset, SEEK_SET);
+	read(fd, binary1, 2048);
+
+	// .text .rodata .data .bss
+	for (int i=1; i<shnum; i++) {
+		if (i == ssndx)
+			continue;
+		char *name = binary1 + sh[i].name;
+		uintptr_t eaddr = sh[i].addr + sh[i].size;
+		if (!strcmp(name, ".text"))
+			e->etext = eaddr;
+		if (!strcmp(name, ".data"))
+			e->edata = eaddr;
+		if (!strcmp(name, ".bss")) {
+			e->end = eaddr;
+			if (!e->edata)
+				e->edata = sh[i].addr;
+		}
+	}
+
+	if (e->end) {
+		e->brk = ROUNDUP(e->end, PGSIZE);
+		vamap(e->pgdir, pagealloc(1), (void*)e->brk, PTE_P | PTE_U | PTE_W);
+	}
+
+	pagedecref(pp);
+}
+int execv(const char *path, char *argv[])
+{
+	int fd = open(path, O_RDONLY);
+	if (fd < 0) return fd;
+	
+	ctask->tf.esp = USTACKTOP;
+	char **cargv = NULL;
+
+	if (!argv)
+		goto noargs;
+	
+	int i = 0, l = 0;
+	while (argv[i]) {
+		l += strlen(argv[i]) + 1;
+		i++;
+	}
+
+	// GCC'S STACK ALIGNMENT
+	// -mpreferred-stack-boundary=num
+	// Attempt to keep the stack boundary aligned to a 2 raised to num byte
+	// boundary. If -mpreferred-stack-boundary is not specified, the default
+	// is 4 (16 bytes or 128 bits).
+	//
+	// We use -mpreferred-stack-boundary=2 for user apps.
+	//
+	// When we enter in user:main, gcc will align the stack. So if we don't
+	// set this, we probably will get wrong args for user main function.
+	//
+	// Remember to modify user/Makefile if you modify this.
+	l = ROUNDUP(l, 4);
+
+	char *cargs = (char*)USTACKTOP - l;
+	*(int*)(cargs - 4) = 0;
+	cargv = (char**)(cargs - 4 - i*4);
+	*(char***)(cargv - 1) = cargv;
+	*(int*)(cargv - 2) = i;
+
+	for (int j=0; j<i; j++) {
+		int k = strlen(argv[j]) + 1;
+		memcpy(cargs, argv[j], k);
+		cargv[j] = cargs;
+		cargs += k;
+	}
+
+	ctask->tf.esp = (uintptr_t)cargv - 8;
+
+noargs:
+	ctask->tf.ebp = 0;
+	ctask->tf.eax = 0;
+
+	__ldelf(ctask, fd);
+
+	close(fd);
+
+	procrestore(ctask);
+
+	return 0;
 }
 
 void exit(void)
 {
-	printf("proc exit [%d]\n", ctask->pid);
 	ctask->state = PROC_ZOMBIE;
-	if (ctask->parent && ctask->parent->state == PROC_BLOCKED)
-		ctask->parent->state = PROC_RUNNABLE;
+	
+	for (int i=0; i<NPOF; i++)
+		if (ctask->filp[i] && close(i));
+
+	struct proc *it = tasks, *ii = procget(PID_INIT);
+	while (it) {
+		if (it->parent == ctask)
+			it->parent = ii;
+		it = it->next;
+	}
+
+	if (ctask->parent)
+		wakeup(ctask->parent);
+
 	scheduler();
 }
 
-pid_t waitpid(pid_t pid)
+void sleep(void *chan)
 {
-	printf("proc wait [%x] ", ctask->pid);
+	ctask->chan = chan;
+	ctask->state = PROC_SLEEPING;
+	
+	procsavecontext(&ctask->ec);
+	
+	if (ctask->state == PROC_SLEEPING)
+		scheduler();
+
+	ctask->chan = 0;
+	ctask->ec.eip = 0;
+}
+
+void wakeup(void *chan)
+{
+	struct proc *it = tasks;
+	while (it) {
+		if (it->state == PROC_SLEEPING && it->chan == chan) {
+			it->state = PROC_RUNNABLE;
+		}
+		it = it->next;
+	}
+	scheduler();
+}
+
+pid_t waitpid(pid_t pid, int options)
+{
 	struct proc *tk = tasks;
 	bool haschild = 0;
 
@@ -209,146 +481,71 @@ tloop:
 	while (tk && (!tk->parent || tk->parent->pid != ctask->pid))
 		tk = tk->next;
 	if (pid != -1 && tk && tk->pid != pid) goto tloop;
-	
+
 	if (!haschild && tk) {
 		haschild = 1;
-		ctask->state = PROC_BLOCKED;
+		ctask->state = PROC_SLEEPING;
 	}
 
 	if (!haschild) {
-		errno = ECHILD;
-		return -1;
+		pid = -ECHILD;
+		goto err;
 	}
 
-	if (tk)
-		printf("<%d>", tk->pid);
 	if (tk && tk->state == PROC_ZOMBIE) {
 		pid_t pid = tk->pid;
 		procfree(tk);
 		goto ret;
 	}
+	
 	if (pid == -1 && tk && (tk = tk->next))
 		goto tloop;
-	scheduler();
+
+	if (options & WNOHANG) {
+		pid = 0;
+		goto ret;
+	}
+
+	sleep(ctask);
+	
+	tk = tasks;
+	goto tloop;
+
 ret:
 	ctask->state = PROC_RUNNING;
+err:
 	return pid;
 }
 
-static void
-region_alloc(struct proc *e, void *va, size_t len)
+int brk(void *addr)
 {
-	// LAB 3: Your code here.
-	// (But only if you need it for load_icode.)
-	//
-	// Hint: It is easier to use region_alloc if the caller can pass
-	//   'va' and 'len' values that are not page-aligned.
-	//   You should round va down, and round (va + len) up.
-	//   (Watch out for corner-cases!)
-	char *vb = ROUNDDOWN(va, PGSIZE);
-	char *vt = ROUNDUP(va + len, PGSIZE);
-
-	for (; vb<vt; vb+=PGSIZE)
-		vamap(e->pgdir, pagealloc(1), vb, PTE_U | PTE_W | PTE_P);
+	if ((uintptr_t)addr < ctask->end || (uintptr_t)addr >= USTACKTOP)
+		return -ENOMEM;
+	void *vb = ROUNDDOWN((void*)ctask->brk, PGSIZE) + PGSIZE;
+	void *vt = ROUNDDOWN(addr, PGSIZE);
+	for (; vb<=vt; vb+=PGSIZE)
+		vamap(ctask->pgdir, pagealloc(1), vb, PTE_P | PTE_U | PTE_W);
+	ctask->brk = (uintptr_t)addr;
+	return 0;
 }
 
-static void
-load_icode(struct proc *e, uint8_t *binary)
+void* sbrk(int inc)
 {
-	lcr3(PADDR(e->pgdir));
-	//panic("aaaaaaaaa");
-	struct elf *eheader = (struct elf*)binary;
-	struct proghdr *ph = (struct proghdr*)(binary + eheader->phoff);
-	struct proghdr *eh = ph + eheader->phnum;
-	e->tf.eip = eheader->entry;
+	uintptr_t ob = ROUNDDOWN(ctask->brk, PGSIZE);
+	uintptr_t nb = ROUNDDOWN(ctask->brk + inc, PGSIZE);
+	uintptr_t brk = ctask->brk;
+	ctask->brk += inc;
 
-	if (ph->filesz > ph->memsz)
-		panic("ELF binary memory overflow.");
-
-	struct page *pp;
-	pte_t *pte;
-	for (; ph<eh; ph++) {
-		if (ph->type == ELF_PROG_LOAD) {
-			region_alloc(e, (char*)ph->va, ph->memsz);
-			memcpy((char*)ph->va, binary + ph->offset, ph->filesz);
-		}
+	if (nb == ob)
+		goto ret;
+	else if (nb > ob) {
+		for (int i=ob+1; i<=nb; i+=PGSIZE)
+			vamap(ctask->pgdir, pagealloc(1), (void*)i, PTE_P | PTE_U | PTE_W);
+	} else {
+		for (int i=ob; i>nb; i-=PGSIZE)
+			vaunmap(ctask->pgdir, (void*)i);
 	}
-	
-	size_t pm = ph->memsz;
-	pm = pm % PGSIZE ? pm / PGSIZE + 1 : pm / PGSIZE;
-	memset((char*)(ph->va+ph->filesz), 0, pm - ph->memsz);
 
-	vamap(e->pgdir, pagealloc(1), (void*)(USTACKTOP-PGSIZE),
-		PTE_P | PTE_U | PTE_W);
-	lcr3(PADDR(kpgdir));
+ret:
+	return (void*)brk;
 }
-
-//
-// Allocates a new env with env_alloc, loads the named elf
-// binary into it with load_icode, and sets its env_type.
-// This function is ONLY called during kernel initialization,
-// before running the first user-mode environment.
-// The new env's parent ID is set to 0.
-//
-void
-env_create(uint8_t *binary)
-{
-	struct proc *e = procalloc();
-	vamap(e->pgdir, pagealloc(1), (void*)(USTACKTOP-PGSIZE), PTE_W | PTE_U | PTE_P);
-	load_icode(e, binary);
-	e->state = PROC_RUNNABLE;
-	e->parent = NULL;
-	ctask = e;
-}
-
-void
-env_pop_tf(struct trapframe *tf)
-{
-	__asm __volatile("movl %0,%%esp\n"
-		"\tpopal\n"
-		"\tpopl %%es\n"
-		"\tpopl %%ds\n"
-		"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-		"\tiret"
-		: : "g" (tf) : "memory");
-	panic("iret failed");  /* mostly to placate the compiler */
-}
-
-//
-// Context switch from curenv to env e.
-// Note: if this is the first call to env_run, curenv is NULL.
-//
-// This function does not return.
-//
-void
-env_run(struct proc *e)
-{
-	// Step 1: If this is a context switch (a new environment is running):
-	//	   1. Set the current environment (if any) back to
-	//	      ENV_RUNNABLE if it is ENV_RUNNING (think about
-	//	      what other states it can be in),
-	//	   2. Set 'curenv' to the new environment,
-	//	   3. Set its status to ENV_RUNNING,
-	//	   4. Update its 'env_runs' counter,
-	//	   5. Use lcr3() to switch to its address space.
-	// Step 2: Use env_pop_tf() to restore the environment's
-	//	   registers and drop into user mode in the
-	//	   environment.
-
-	// Hint: This function loads the new environment's state from
-	//	e->env_tf.  Go back through the code you wrote above
-	//	and make sure you have set the relevant parts of
-	//	e->env_tf to sensible values.
-
-	// LAB 3: Your code here.
-	if (e != ctask && ctask->state == PROC_RUNNING)
-		ctask->state = PROC_RUNNABLE;
-	ctask = e;
-	e->state = PROC_RUNNING;
-	e->count++;
-	//printf("proc run %.8x\n", e->pid);
-	lcr3(PADDR(e->pgdir));
-	
-	env_pop_tf(&(e->tf));
-}
-

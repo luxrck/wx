@@ -17,6 +17,5 @@ _start:
 
 args_exist:
 	call main
-	call sys_exit
+	call exit
 1:	jmp 1b
-

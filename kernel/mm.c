@@ -129,14 +129,14 @@ pte_t* pteget(pde_t *pgdir, const void *va, int create)
 	return &pte[PTX(va)];
 }
 
-void pageforeach(pde_t *pgdir, int(*cb)(int index, pte_t pte, void *data), void *data)
+void pageforeach(pde_t *pgdir, pageforeachcallback cb, void *data)
 {
 	for (int i=0; i<0x3FF; i++) {
 		if (!pgdir[i]) continue;
 		pte_t *pte = KADDR(PTE_ADDR(pgdir[i]));
 		for (int j=0; j<0x3FF; j++) {
 			if (!pte[j]) continue;
-			if (!cb(i*0x400+j, pte[j], data)) return;
+			if (!cb(pgdir, i*0x400+j, pte[j], data)) return;
 		}
 	}
 }
@@ -155,7 +155,7 @@ ret:
 	return 0;
 err:
 	pp->ref--;
-	return -E_NO_MEM;
+	return -ENOMEM;
 }
 
 struct page* pageget(pde_t *pgdir, void *va, pte_t **pte_store)
@@ -170,7 +170,7 @@ struct page* pageget(pde_t *pgdir, void *va, pte_t **pte_store)
 
 void pagedecref(struct page *pg)
 {
-	if (!--pg->ref) {
+	if (--pg->ref <= 0) {
 		pg->next = pages;
 		pages = pg;
 	}

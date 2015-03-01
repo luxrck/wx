@@ -12,7 +12,7 @@ char* readline(const char *prompt)
 	while (1) {
 		c = getchar();
 		if (c < 0) {
-			if (c != -E_EOF)
+			if (c != -EOF)
 				printf("read error: %e\n", c);
 			return NULL;
 		} else if ((c == '\b' || c == '\x7f') && i > 0) {

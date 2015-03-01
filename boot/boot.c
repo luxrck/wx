@@ -1,6 +1,3 @@
-#include <x86.h>
-#include <elf.h>
-
 /**********************************************************************
  * This a dirt simple boot loader, whose sole job is to boot
  * an ELF kernel image from the first IDE hard disk.
@@ -29,7 +26,11 @@
  *  * bootloader() in this file takes over, reads in the kernel and jumps to it.
  **********************************************************************/
 
+#include <x86.h>
+#include <elf.h>
+
 #define SECTSIZE	512
+#define KBASE		26
 #define kernel		((struct elf *) 0x10000) // scratch space
 
 void readsect(void *dst, uint32_t base, uint32_t nsec);
@@ -39,7 +40,7 @@ void bootloader(void)
 	struct proghdr *ph, *eph;
 
 	// read 1st page off disk
-	readsect((void*)kernel, 1, 8);
+	readsect((void*)kernel, KBASE, 8);
 
 	// is this a valid ELF?
 	if (kernel->magic != ELF_MAGIC) return;
@@ -47,10 +48,13 @@ void bootloader(void)
 	// load each program segment (ignores ph flags)
 	ph = (struct proghdr *) ((uint8_t *) kernel + kernel->phoff);
 	eph = ph + kernel->phnum;
-	for (; ph < eph; ph++)
+	for (; ph < eph; ph++) {
+		uint32_t pa = ROUNDDOWN(ph->pa, SECTSIZE);
 		// 1st sector is used by bootloader, kernel start at 2nd sector.
-		readsect((void*)ph->pa, (ph->offset/SECTSIZE)+1,
-			(ph->pa+ph->memsz)/SECTSIZE - ph->pa/SECTSIZE);
+		for (int i=0; i<ph->memsz; i+=SECTSIZE) {
+			readsect((void*)pa + i, (ph->offset+i)/SECTSIZE+KBASE, 1);
+		}
+	}
 
 	// call the entry point from the ELF header
 	// note: does not return!
@@ -82,5 +86,4 @@ void readsect(void *dst, uint32_t sector, uint32_t nsec)
 		// read a sector
 		insl(0x1F0, dst, SECTSIZE/4);
 	}
-
 }

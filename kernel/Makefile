@@ -1,28 +1,29 @@
 include ../Makefile.header
 
 CFLAGS 		+= -I../include -I..
-KLDFLAGS	:= $(LDFLAGS) -T kernel.ld -nostdlib
-
-UBIN		:= $(addprefix ../user/_, $(UBIN))
-
-QEMU		:= qemu
-QEMUOPT		:= -kernel kernel -gdb tcp::23456
+KLDFLAGS	:= $(LDFLAGS) -T kernel.ld
 
 SRC			:= entry.S			\
 			bootpgdir.c			\
 			init.c				\
 			kclock.c			\
-			console.c			\
 			pic.c				\
 			sched.c				\
 			mm.c				\
+			ide.c				\
+			pipe.c				\
+			console.c			\
+			device.c			\
+			fs.c				\
 			proc.c				\
 			syscall.c			\
 			trapentry.S			\
 			trap.c				\
 			kshell.c			\
+			printf.c			\
+			../lib/assert.c		\
 			../lib/string.c		\
-			../lib/printf.c		\
+			../lib/printfmt.c	\
 			../lib/readline.c
 
 OBJ			:= $(patsubst %.c, %.o, $(SRC))
@@ -35,15 +36,9 @@ OBJ			:= $(patsubst %.S, %.o, $(OBJ))
 %.o: ../lib/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-kernel: kernel.ld $(OBJ) $(UBIN)
-	$(LD) -o $@ $(KLDFLAGS) $(OBJ) $(GCC_LIB) -b binary $(UBIN)
+kernel: kernel.ld $(OBJ)
+	$(LD) -o $@ $(KLDFLAGS) $(OBJ) $(GCC_LIB)
 	$(OBJDUMP) -S $@ > $@.asm
-
-qemu: kernel
-	$(QEMU) $(QEMUOPT)
-
-qemu-gdb:
-	$(QEMU) $(QEMUOPT) -S
 
 clean:
 	rm -f *.o *.d kernel kernel.asm

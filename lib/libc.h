@@ -1,16 +1,71 @@
-#ifndef __LIBC__
-#define __LIBC__
+#include <stdio.h>
+#include <errno.h>
+#include <assert.h>
 
-void sys_hello(void);
+#include <kernel/kernel.h>
 
-void sys_a(void);
-void sys_b(void);
-pid_t sys_fork(void);
-pid_t sys_waitpid(pid_t pid);
-void sys_wait(void);
-void sys_exit(void);
-pid_t sys_getpid(void);
-pid_t sys_getppid(void);
-time_t sys_time(time_t *t);
+#define syscall0(rtype, name)	\
+rtype name(void)				\
+{								\
+	int ret;					\
+	asm volatile("int %1\n"		\
+		: "=a"(ret)				\
+		: "i"(T_SYSCALL),		\
+		  "a"(SYS_##name)		\
+		: "cc", "memory");		\
+	if (ret >= 0)				\
+		return (rtype) ret;		\
+	errno = -ret;				\
+	return -1;					\
+}
 
-#endif /* !__LIBC__ */
+#define syscall1(rtype, name, t1, a1)	\
+rtype name(t1 a1)				\
+{								\
+	int ret;					\
+	asm volatile("int %1\n"		\
+		: "=a"(ret)				\
+		: "i"(T_SYSCALL),		\
+		  "a"(SYS_##name),		\
+		  "b"(a1)				\
+		: "cc", "memory");		\
+	if (ret >= 0)				\
+		return (rtype) ret;		\
+	errno = -ret;				\
+	return (rtype) -1;			\
+}
+
+#define syscall2(rtype, name, t1, a1, t2, a2)	\
+rtype name(t1 a1, t2 a2)		\
+{								\
+	int ret;					\
+	asm volatile("int %1\n"		\
+		: "=a"(ret)				\
+		: "i"(T_SYSCALL),		\
+		  "a"(SYS_##name),		\
+		  "b"(a1),				\
+		  "c"(a2)				\
+		: "cc", "memory");		\
+	if (ret >= 0)				\
+		return (rtype) ret;		\
+	errno = -ret;				\
+	return (rtype) -1;			\
+}
+
+#define syscall3(rtype, name, t1, a1, t2, a2, t3, a3)	\
+rtype name(t1 a1, t2 a2, t3 a3)	\
+{								\
+	int ret;					\
+	asm volatile("int %1\n"		\
+		: "=a"(ret)				\
+		: "i"(T_SYSCALL),		\
+		  "a"(SYS_##name),		\
+		  "b"(a1),				\
+		  "c"(a2),				\
+		  "d"(a3)				\
+		: "cc", "memory");		\
+	if (ret >= 0)				\
+		return (rtype) ret;		\
+	errno = -ret;				\
+	return (rtype) -1;			\
+}

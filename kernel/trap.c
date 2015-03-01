@@ -56,6 +56,8 @@ void print_trapframe(struct trapframe *tf)
 
 void trap(struct trapframe *tf)
 {
+	//if (tf->trapno != 0x20 && ctask->pid != 1)
+	//	printf("trapno: %x %d %d %x\n", tf->trapno, ctask->pid, tf->eax, tf->esp);
 	if ((tf->cs & 3) == 3) {
 		ctask->tf = *tf;
 		tf = &ctask->tf;
@@ -67,7 +69,6 @@ void trap(struct trapframe *tf)
 		break;
 	case T_PGFLT:
 		print_trapframe(tf);
-		//printf("<PGFLT>");
 		kshell();
 		break;
 	case T_SYSCALL:
@@ -86,10 +87,11 @@ void trap(struct trapframe *tf)
 		break;
 
 	case IRQ_OFFSET + IRQ_TIMER:
+		//printf("esp %x\n",tf->esp);
 		break;
 	
 	case IRQ_OFFSET + IRQ_KBD:
-		printf("irq_kbd\n");
+		kbd_intr();
 		break;
 	
 	default:
