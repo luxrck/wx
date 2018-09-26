@@ -152,7 +152,7 @@ static int kbd_getchar(void)
 void kbd_intr(void)
 {
 	char key = kbd_getchar();
-	if (key == '\b' || key == KEY_DEL) {
+	if (key == '\b' || key == (char)KEY_DEL) {
 		if (ibuf.wpos != ibuf.rpos) {
 			putchar(key);
 			ibuf.wpos--;

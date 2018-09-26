@@ -37,7 +37,7 @@ static void procuserinit(void)
 	struct proc *e = procalloc();
 
 	vamap(e->pgdir, pagealloc(1), (void*)(UXSTACKTOP-PGSIZE), PTE_W|PTE_U|PTE_P);
-	
+
 	vamap(e->pgdir, pagealloc(1), (void*)(USTACKTOP-PGSIZE), PTE_W|PTE_U|PTE_P);
 	vamap(e->pgdir, pagealloc(1), (void*)(USTACKTOP-PGSIZE*2), PTE_W|PTE_U|PTE_P);
 
@@ -148,12 +148,12 @@ void procfree(struct proc *tk)
 	struct proc *it = tasks;
 	if (tasks != tk)
 		while (it && it->next != tk) it = it->next;
-	else 
+	else
 		tasks = tasks->next;
 	if (it) it->next = tk->next;
-	
+
 	memset(tk, 0, sizeof(struct trapframe));
-	
+
 	tk->root = tk->cwd = 0;
 	tk->sb = 0;
 
@@ -165,7 +165,13 @@ void procfree(struct proc *tk)
 // THIS IMPLEMENTATION RELAY ON C'S CALL STACK.
 void procsavecontext(struct procexec *ec)
 {
-	asm volatile("movl 8(%%ebp),	%%esp\n\t"
+	asm volatile(
+		// In this function, C didn't help us to push & modify %ebp, %esp automatically.
+		// So I did this manually.
+		"push	%%ebp\n\t"
+		"movl	%%esp,      %%ebp\n\t"
+
+        "movl	8(%%ebp),	%%esp\n\t"
 		"addl	$36,		%%esp\n\t"
 		"pusha\n\t"
 		"movl	(%%ebp),	%%eax\n\t"
@@ -180,18 +186,26 @@ void procsavecontext(struct procexec *ec)
 		//"movl	%%eax,		(%%esp)\n"		// recall parent function
 		//"movl (%%ebp),	16(%%esp)"
 		//"1:\n\t"
-		"movl	%%ebp,		%%esp"
+		"movl	%%ebp,		%%esp\n\t"
+		"pop    %%ebp\n\t"
+		"ret\n\t"
 		::: "memory" );
 }
 
 void procrestorecontext(struct procexec *ec)
 {
-	asm volatile("movl 8(%%ebp), %%esp\n\t"
-		"addl $4, %%esp\n\t"
+	asm volatile(
+		"push	%%ebp\n\t"
+		"movl	%%esp,		%%ebp\n\t"
+		"movl	8(%%ebp),	%%esp\n\t"
+		"addl	$4,			%%esp\n\t"
 		"popal\n\t"
-		"movl %%esp, %%eax\n\t"
-		"movl -20(%%eax), %%esp\n\t"
-		"jmp *-36(%%eax)"
+		"movl	%%esp,		%%eax\n\t"
+		"movl	-20(%%eax),	%%esp\n\t"
+		"jmp	*-36(%%eax)\n\t"
+
+		// Never reach here.
+		"ret\n\t"
 		::: "memory" );
 }
 
@@ -206,7 +220,7 @@ void procrestore(struct proc* tk)
 	lcr3(PADDR(ctask->pgdir));
 
 	ctask->count++;
-	
+
 	if (ctask->ec.eip)
 		procrestorecontext(&ctask->ec);
 
@@ -234,17 +248,17 @@ pid_t fork(void)
 	struct proc *child;
 	if (!(child = procalloc()))
 		return -EAGAIN;
-	
+
 	pageforeach(ctask->pgdir, __duppage, child->pgdir);
-	
+
 	vamap(child->pgdir, pagealloc(1), (void*)(UXSTACKTOP-PGSIZE), PTE_W|PTE_U|PTE_P);
 	vamap(child->pgdir, pagealloc(1), (void*)(UXSTACKTOP-PGSIZE*2), PTE_W|PTE_U|PTE_P);
-	
+
 	child->tf = ctask->tf;
 	child->tf.eax = 0;
 	child->parent = ctask;
 	child->state = PROC_RUNNABLE;
-	
+
 	child->etext = ctask->etext;
 	child->edata = ctask->edata;
 	child->end = ctask->end;
@@ -300,7 +314,7 @@ static void __elfsegldd(int fd, void *va, off_t offset, size_t count)
 static void __ldelf(struct proc *e, int fd)
 {
 	lcr3(PADDR(e->pgdir));
-	
+
 	struct page *pp = pagealloc(1);
 	char *binary = (char*)page2kva(pp);
 
@@ -333,13 +347,13 @@ static void __ldelf(struct proc *e, int fd)
 	lseek(fd, eheader->shoff, SEEK_SET);
 	uint16_t ssndx = eheader->shstrndx;
 	uint16_t shnum = eheader->shnum;
-	
+
 	read(fd, binary, 2048);
 	char *binary1 = binary + 2048;
 
 	struct secthdr *sh = (struct secthdr*)binary;
 	struct secthdr *ss = sh + ssndx;
-	
+
 	lseek(fd, ss->offset, SEEK_SET);
 	read(fd, binary1, 2048);
 
@@ -371,13 +385,13 @@ int execv(const char *path, char *argv[])
 {
 	int fd = open(path, O_RDONLY);
 	if (fd < 0) return fd;
-	
+
 	ctask->tf.esp = USTACKTOP;
 	char **cargv = NULL;
 
 	if (!argv)
 		goto noargs;
-	
+
 	int i = 0, l = 0;
 	while (argv[i]) {
 		l += strlen(argv[i]) + 1;
@@ -429,9 +443,9 @@ noargs:
 void exit(void)
 {
 	ctask->state = PROC_ZOMBIE;
-	
+
 	for (int i=0; i<NPOF; i++)
-		if (ctask->filp[i] && close(i));
+		if (ctask->filp[i] && close(i)){}
 
 	struct proc *it = tasks, *ii = procget(PID_INIT);
 	while (it) {
@@ -450,9 +464,9 @@ void sleep(void *chan)
 {
 	ctask->chan = chan;
 	ctask->state = PROC_SLEEPING;
-	
+
 	procsavecontext(&ctask->ec);
-	
+
 	if (ctask->state == PROC_SLEEPING)
 		scheduler();
 
@@ -497,7 +511,7 @@ tloop:
 		procfree(tk);
 		goto ret;
 	}
-	
+
 	if (pid == -1 && tk && (tk = tk->next))
 		goto tloop;
 
@@ -507,7 +521,7 @@ tloop:
 	}
 
 	sleep(ctask);
-	
+
 	tk = tasks;
 	goto tloop;
 

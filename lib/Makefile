@@ -1,7 +1,7 @@
 include ../Makefile.header
 
 CFLAGS += -I../include -I..
- 
+
 SRC := assert.c	\
 	brk.c		\
 	close.c		\

@@ -1,6 +1,6 @@
 include Makefile.header
 
-QEMU		:= qemu
+QEMU		:= qemu-system-i386
 QEMUOPT		:= -hda kernel.img -serial stdio -gdb tcp::23456
 
 all:

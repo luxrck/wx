@@ -104,7 +104,7 @@ uint16_t balloc(uint8_t dev)
 struct bcache* getblk(uint8_t dev, uint32_t blkno)
 {
 	if (ctask)
-		procsavecontext(&ctask->ec);
+		procsavecontext(&(ctask->ec));
 
 	struct bcache *bc = bchead;
 	while (bc) {
@@ -166,7 +166,7 @@ void brelse(struct bcache *bc)
 	bchead = bc;
 }
 
-void inodezoneforeach(struct minode *mi, 
+void inodezoneforeach(struct minode *mi,
 	int (*cb)(struct minode *mi, uint16_t i, uint16_t b, void *data),
 	void *data)
 {
@@ -271,13 +271,13 @@ uint16_t bmap(struct minode *mi, uint16_t bno)
 {
 	if (bno >= NDIRECT + NIDIRECT)
 		panic("file is too big.");
-	
+
 	if (bno < NDIRECT) {
 		if (!mi->zone[bno])
 			mi->zone[bno] = balloc(mi->sb->dev);
 		return mi->zone[bno];
 	}
-	
+
 	if (!mi->zone[NDIRECT]) {
 		mi->zone[NDIRECT] = balloc(mi->sb->dev);
 		return mi->zone[NDIRECT];
@@ -325,7 +325,7 @@ struct minode* __rooti(const char **path)
 		(*path)++;
 	} else
 		ci = iget(ctask->sb, ctask->cwd);
-	
+
 	// check wd is still alive or not
 	if (!ci->nlink) return NULL;
 
@@ -367,13 +367,13 @@ struct minode* namei(const char *path, int *error, bool iparent)
 	int vinodes[64] = {0}, vi = 0, err = 0;
 	const char *name = basename(path);
 	struct minode *ci = __rooti(&path);
-	
+
 	if (error) *error = 0;
 
 	if (!ci) return NULL;
 
 	vinodes[vi++] = ci->inum;
-	
+
 	while ((iparent && path < name) || (!iparent && *path)) {
 		if ((err = __pathi(&ci, &path)))
 			goto err;
@@ -519,7 +519,7 @@ int open(const char *path, int flags)
 
 	struct file *file = filealloc();
 	int fd = fdalloc();
-	
+
 	if (!file) return -ENFILE;
 	if (fd == -1) return -EMFILE;
 
@@ -556,7 +556,7 @@ int close(int fd)
 	struct file *file = ctask->filp[fd];
 	if (!file) return -EBADF;
 	if (--file->ref) goto ret;
-	
+
 	struct minode *mi = file->inode;
 	uint8_t dev = mi->dev;
 
@@ -670,10 +670,10 @@ int write(int fd, const char *buf, size_t count)
 		uc -= BLKSIZE;
 	}
 r3:
-	
-	if (uc);
+
+	if (uc)
 		__blkwrite(file, &buf, uc);
-	
+
 	isync(file->inode);
 	return count;
 }
@@ -693,7 +693,7 @@ int mknod(const char *path, mode_t mode, dev_t dev)
 	}
 
 	mode == S_IFREG ? IT_REGULA : IT_DEVICE;
-	
+
 	struct minode *pi = namei(path, &error, 1);
 	if (!(mi = dirset(pi, basename(path), mode, &error, 0))) {
 		iput(pi);
@@ -764,13 +764,13 @@ int mkdir(const char *path)
 		iput(mi);
 		return -EEXIST;
 	}
-	
+
 	struct minode *pi = namei(path, &error, 1);
 	if (!(mi = dirset(pi, basename(path), IT_DIRENT, &error, 0))) {
 		iput(pi);
 		return error;
 	}
-	
+
 	bmap(mi, 0);
 	dirset(mi, ".", IT_DIRENT, &error, mi->inum);
 	dirset(mi, "..", IT_DIRENT, &error, pi->inum);
@@ -899,7 +899,7 @@ int unlink(const char *path)
 		iput(mi);
 		return -EINVAL;
 	}
-	
+
 	struct dir dirent;
 	dirent.inum = mi->inum;
 	strcpy(dirent.name, name);
@@ -913,7 +913,7 @@ int unlink(const char *path)
 	mi = iget(sb, dirent.inum);
 	mi->nlink--;
 	iput(mi);
-	
+
 	return 0;
 }
 
